@@ -1,268 +1,173 @@
-/* Pro To-Do — script.js
-   Features: add, edit, delete, complete, filters, drag & drop, localStorage persistence
-*/
-
 (() => {
-  const STORAGE_KEY = "pro-todo-v1";
-  const form = document.getElementById("todo-form");
-  const input = document.getElementById("todo-input");
-  const listEl = document.getElementById("todo-list");
-  const filters = document.querySelectorAll(".filter");
-  const itemsLeftEl = document.getElementById("items-left");
-  const clearCompletedBtn = document.getElementById("clear-completed");
-  const toggleThemeBtn = document.getElementById("toggle-theme");
+const STORAGE_KEY = "shiine10-pro-todo-v2";
+const form = document.getElementById("todo-form");
+const input = document.getElementById("todo-input");
+const categoryInput = document.getElementById("category-input");
+const dueInput = document.getElementById("due-date-input");
+const listEl = document.getElementById("todo-list");
+const filters = document.querySelectorAll(".filter");
+const searchInput = document.getElementById("search-input");
+const itemsLeftEl = document.getElementById("items-left");
+const clearCompletedBtn = document.getElementById("clear-completed");
+const toggleThemeBtn = document.getElementById("toggle-theme");
+const chartCanvas = document.getElementById("progress-chart");
+let tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+let currentFilter = "all";
 
-  let tasks = load();
-  let currentFilter = "all";
-  let dragSrcEl = null;
+// ----------------------
+// Render Functions
+// ----------------------
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 
-  // --- Persistence ---
-  function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      console.error("Failed to parse tasks:", e);
-      return [];
+function render(){
+  listEl.innerHTML = "";
+  let filtered = tasks.filter(t=>{
+    if(currentFilter==="active") return !t.completed;
+    if(currentFilter==="completed") return t.completed;
+    return true;
+  });
+  const search = searchInput.value.trim().toLowerCase();
+  if(search) filtered = filtered.filter(t=>t.text.toLowerCase().includes(search));
+
+  filtered.forEach(task=>{
+    const li = document.createElement("li");
+    li.className="todo__item";
+    li.draggable=true;
+    li.dataset.id=task.id;
+
+    // checkbox
+    const cb = document.createElement("button");
+    cb.className="checkbox"+(task.completed?" checked":"");
+    cb.innerHTML = task.completed? "✓":"";
+    cb.addEventListener("click",()=>{ task.completed=!task.completed; render(); });
+
+    // task text + category + due
+    const taskDiv = document.createElement("div");
+    taskDiv.className="task";
+    const textSpan = document.createElement("span");
+    textSpan.className="text"+(task.completed?" completed":"");
+    textSpan.textContent = task.text;
+    taskDiv.appendChild(textSpan);
+    if(task.category) {
+      const catSpan = document.createElement("span");
+      catSpan.style.color="#2563eb";
+      catSpan.style.fontWeight="600";
+      catSpan.style.marginLeft="6px";
+      catSpan.textContent=`[${task.category}]`;
+      taskDiv.appendChild(catSpan);
     }
-  }
-
-  // --- Utilities ---
-  function uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
-  }
-
-  function render() {
-    listEl.innerHTML = "";
-    const visible = tasks.filter(t => {
-      if (currentFilter === "active") return !t.completed;
-      if (currentFilter === "completed") return t.completed;
-      return true;
-    });
-
-    for (const task of visible) {
-      const li = document.createElement("li");
-      li.className = "todo__item";
-      li.draggable = true;
-      li.dataset.id = task.id;
-
-      // checkbox
-      const cb = document.createElement("button");
-      cb.className = "checkbox" + (task.completed ? " checked" : "");
-      cb.setAttribute("aria-pressed", String(task.completed));
-      cb.title = task.completed ? "Mark as active" : "Mark as completed";
-      cb.innerHTML = task.completed ? '<span class="check-icon">✓</span>' : "";
-      cb.addEventListener("click", () => {
-        toggleComplete(task.id);
-      });
-
-      // task text container
-      const taskDiv = document.createElement("div");
-      taskDiv.className = "task";
-
-      const text = document.createElement("span");
-      text.className = "text" + (task.completed ? " completed" : "");
-      text.textContent = task.text;
-      text.title = "Double-click or press Enter to edit";
-      text.tabIndex = 0;
-      text.addEventListener("dblclick", () => startEdit(task.id, li));
-      text.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") startEdit(task.id, li);
-      });
-
-      taskDiv.appendChild(text);
-
-      // actions
-      const editBtn = document.createElement("button");
-      editBtn.className = "icon-btn";
-      editBtn.title = "Edit";
-      editBtn.innerHTML = "✎";
-      editBtn.addEventListener("click", () => startEdit(task.id, li));
-
-      const delBtn = document.createElement("button");
-      delBtn.className = "icon-btn";
-      delBtn.title = "Delete";
-      delBtn.innerHTML = "🗑";
-      delBtn.addEventListener("click", () => removeTask(task.id));
-
-      li.appendChild(cb);
-      li.appendChild(taskDiv);
-      li.appendChild(editBtn);
-      li.appendChild(delBtn);
-
-      // drag events
-      li.addEventListener("dragstart", dragStart);
-      li.addEventListener("dragover", dragOver);
-      li.addEventListener("dragenter", dragEnter);
-      li.addEventListener("dragleave", dragLeave);
-      li.addEventListener("drop", drop);
-      li.addEventListener("dragend", dragEnd);
-
-      listEl.appendChild(li);
+    if(task.due) {
+      const dueSpan = document.createElement("span");
+      dueSpan.style.color="#ef4444";
+      dueSpan.style.marginLeft="6px";
+      const dueDate = new Date(task.due);
+      const today = new Date();
+      dueSpan.textContent=`Due: ${dueDate.toLocaleDateString()}`;
+      if(dueDate<today && !task.completed) dueSpan.style.fontWeight="700";
+      taskDiv.appendChild(dueSpan);
     }
 
-    updateItemsLeft();
-    save();
-  }
+    // actions
+    const delBtn = document.createElement("button");
+    delBtn.className="icon-btn"; delBtn.innerHTML="🗑";
+    delBtn.addEventListener("click",()=>{ tasks=tasks.filter(t2=>t2.id!==task.id); render(); });
 
-  // --- CRUD ---
-  function addTask(text) {
-    const t = { id: uid(), text: text.trim(), completed: false, created: Date.now() };
-    tasks.unshift(t); // newest on top
-    render();
-  }
-
-  function removeTask(id) {
-    tasks = tasks.filter(t => t.id !== id);
-    render();
-  }
-
-  function toggleComplete(id) {
-    const t = tasks.find(x => x.id === id);
-    if (!t) return;
-    t.completed = !t.completed;
-    render();
-  }
-
-  function startEdit(id, li) {
-    const t = tasks.find(x => x.id === id);
-    if (!t) return;
-    const taskDiv = li.querySelector(".task");
-    taskDiv.innerHTML = "";
-
-    const input = document.createElement("input");
-    input.className = "edit";
-    input.value = t.text;
-    input.type = "text";
-    input.setAttribute("aria-label", "Edit task text");
-    taskDiv.appendChild(input);
-    input.focus();
-    // place caret at end
-    input.setSelectionRange(input.value.length, input.value.length);
-
-    function commit() {
-      const val = input.value.trim();
-      if (!val) { removeTask(id); return; }
-      t.text = val;
-      render();
-    }
-    function cancel() {
-      render();
-    }
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") commit();
-      if (e.key === "Escape") cancel();
-    });
-    input.addEventListener("blur", commit);
-  }
-
-  // --- Filters & UI ---
-  filters.forEach(btn => {
-    btn.addEventListener("click", () => {
-      filters.forEach(b => b.classList.remove("active"));
-      filters.forEach(b => b.setAttribute("aria-selected", "false"));
-      btn.classList.add("active");
-      btn.setAttribute("aria-selected", "true");
-      currentFilter = btn.dataset.filter;
-      render();
-    });
+    li.appendChild(cb);
+    li.appendChild(taskDiv);
+    li.appendChild(delBtn);
+    listEl.appendChild(li);
   });
 
-  function updateItemsLeft() {
-    const left = tasks.filter(t => !t.completed).length;
-    itemsLeftEl.textContent = `${left} item${left !== 1 ? "s" : ""} left`;
-  }
+  updateFooter();
+  renderChart();
+  save();
+}
 
-  clearCompletedBtn.addEventListener("click", () => {
-    tasks = tasks.filter(t => !t.completed);
-    render();
-  });
+function updateFooter(){
+  const left = tasks.filter(t=>!t.completed).length;
+  itemsLeftEl.textContent=`${left} item${left!==1?"s":""} left`;
+}
 
-  toggleThemeBtn.addEventListener("click", () => {
-    const dark = document.documentElement.getAttribute("data-theme") !== "dark";
-    if (dark) {
-      document.documentElement.setAttribute("data-theme", "dark");
-      document.documentElement.style.setProperty("--bg", "#0b1220");
-      document.documentElement.style.setProperty("--card", "#071032");
-      document.documentElement.style.setProperty("--muted", "#a8b3c7");
-      document.documentElement.style.setProperty("--accent", "#7dd3fc");
-      toggleThemeBtn.textContent = "Light";
-      toggleThemeBtn.setAttribute("aria-pressed", "true");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-      document.documentElement.style.removeProperty("--bg");
-      document.documentElement.style.removeProperty("--card");
-      document.documentElement.style.removeProperty("--muted");
-      document.documentElement.style.removeProperty("--accent");
-      toggleThemeBtn.textContent = "Dark";
-      toggleThemeBtn.setAttribute("aria-pressed", "false");
-    }
-  });
-
-  // --- Drag & Drop handlers ---
-  function dragStart(e) {
-    dragSrcEl = this;
-    this.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-    try { e.dataTransfer.setData("text/plain", this.dataset.id); } catch (err) { /* IE fallback */ }
-  }
-  function dragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
-  function dragEnter(e) {
-    this.classList.add("drag-over");
-  }
-  function dragLeave(e) {
-    this.classList.remove("drag-over");
-  }
-  function drop(e) {
-    e.stopPropagation();
-    this.classList.remove("drag-over");
-    const srcId = e.dataTransfer.getData("text/plain") || (dragSrcEl && dragSrcEl.dataset.id);
-    const dstId = this.dataset.id;
-    if (!srcId || srcId === dstId) return;
-
-    // reorder tasks array
-    const srcIndex = tasks.findIndex(t => t.id === srcId);
-    const dstIndex = tasks.findIndex(t => t.id === dstId);
-    if (srcIndex < 0 || dstIndex < 0) return;
-
-    const [moved] = tasks.splice(srcIndex, 1);
-    tasks.splice(dstIndex, 0, moved);
-    render();
-  }
-  function dragEnd(e) {
-    if (dragSrcEl) dragSrcEl.classList.remove("dragging");
-    dragSrcEl = null;
-    document.querySelectorAll(".todo__item.drag-over").forEach(el => el.classList.remove("drag-over"));
-  }
-
-  // --- Form submit ---
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const val = input.value.trim();
-    if (!val) return;
-    addTask(val);
-    input.value = "";
-    input.focus();
-  });
-
-  // keyboard shortcut: press "n" to focus new task input
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "n" && !/input|textarea/i.test(document.activeElement.tagName)) {
-      e.preventDefault();
-      input.focus();
-    }
-  });
-
-  // initial render
+// ----------------------
+// Form
+// ----------------------
+form.addEventListener("submit",(e)=>{
+  e.preventDefault();
+  const text = input.value.trim();
+  if(!text) return;
+  const newTask = { id: uid(), text, category: categoryInput.value.trim(), due: dueInput.value, completed:false };
+  tasks.unshift(newTask);
+  input.value=""; categoryInput.value=""; dueInput.value="";
   render();
+});
 
-  // expose for debugging from console
-  window.__PRO_TODO = { tasks, save, load, render };
+// ----------------------
+// Filters
+// ----------------------
+filters.forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    filters.forEach(b=>{b.classList.remove("active");b.setAttribute("aria-selected","false");});
+    btn.classList.add("active"); btn.setAttribute("aria-selected","true");
+    currentFilter=btn.dataset.filter;
+    render();
+  });
+});
+
+// ----------------------
+// Search
+// ----------------------
+searchInput.addEventListener("input",render);
+
+// ----------------------
+// Clear Completed
+// ----------------------
+clearCompletedBtn.addEventListener("click",()=>{ tasks=tasks.filter(t=>!t.completed); render(); });
+
+// ----------------------
+// Theme
+// ----------------------
+toggleThemeBtn.addEventListener("click",()=>{
+  const dark = document.documentElement.getAttribute("data-theme")!=="dark";
+  if(dark){
+    document.documentElement.setAttribute("data-theme","dark");
+    document.body.style.background="#0b1220"; document.body.style.color="#fff";
+    toggleThemeBtn.textContent="Light";
+  }else{
+    document.documentElement.removeAttribute("data-theme");
+    document.body.style.background="linear-gradient(180deg,#f3f6fb 0%, #f6f8fb 100%)";
+    document.body.style.color="#071032";
+    toggleThemeBtn.textContent="Dark";
+  }
+});
+
+// ----------------------
+// Dashboard Chart
+// ----------------------
+function renderChart(){
+  if(!chartCanvas) return;
+  const ctx = chartCanvas.getContext("2d");
+  ctx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+  const completed = tasks.filter(t=>t.completed).length;
+  const active = tasks.length - completed;
+  const total = tasks.length || 1;
+  const width = chartCanvas.width;
+  const height = chartCanvas.height;
+  const completedWidth = width*(completed/total);
+  const activeWidth = width*(active/total);
+
+  // active bar
+  ctx.fillStyle="#2563eb"; ctx.fillRect(0,10,activeWidth,40);
+  // completed bar
+  ctx.fillStyle="#06b6d4"; ctx.fillRect(activeWidth,10,completedWidth,40);
+
+  ctx.fillStyle="#000"; ctx.font="14px Arial";
+  ctx.fillText(`Active: ${active}`,10,70);
+  ctx.fillText(`Completed: ${completed}`,150,70);
+}
+
+// ----------------------
+// Initial render
+// ----------------------
+render();
 })();

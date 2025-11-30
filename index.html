@@ -1,46 +1,56 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pro To-Do List</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Pro To-Do App | Shiine10</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.png">
 </head>
 <body>
-  <main class="app" id="app">
+  <main class="app">
     <header class="app__header">
-      <h1 class="logo">Pro To-Do</h1>
-      <p class="subtitle">Get things done — simple, fast, beautiful.</p>
+      <h1 class="logo">Shiine10 To-Do</h1>
+      <p class="subtitle">Your tasks, organized beautifully.</p>
+      <div class="theme-switcher">
+        <button id="toggle-theme" class="btn btn--ghost" aria-pressed="false">Dark</button>
+      </div>
     </header>
 
     <section class="todo">
       <form id="todo-form" class="todo__form" aria-label="Add new task">
-        <input id="todo-input" class="todo__input" type="text" placeholder="Add new task…" aria-label="New task" required />
-        <button class="btn btn--primary" type="submit" aria-label="Add task">Add</button>
+        <input type="text" id="todo-input" class="todo__input" placeholder="Add new task…" required>
+        <input type="text" id="category-input" class="todo__input category-input" placeholder="Category (optional)">
+        <input type="date" id="due-date-input" class="todo__input due-date-input">
+        <button class="btn btn--primary" type="submit">Add Task</button>
       </form>
 
       <div class="todo__controls">
-        <div class="filters" role="tablist" aria-label="Filter tasks">
+        <div class="filters" role="tablist">
           <button class="filter active" data-filter="all" role="tab" aria-selected="true">All</button>
           <button class="filter" data-filter="active" role="tab" aria-selected="false">Active</button>
           <button class="filter" data-filter="completed" role="tab" aria-selected="false">Completed</button>
         </div>
-
+        <input type="text" id="search-input" placeholder="Search tasks..." class="search-bar">
         <div class="actions">
           <button id="clear-completed" class="btn btn--ghost">Clear completed</button>
-          <button id="toggle-theme" class="btn btn--ghost" aria-pressed="false">Dark</button>
         </div>
       </div>
 
       <ul id="todo-list" class="todo__list" aria-live="polite"></ul>
 
-      <footer class="todo__footer" aria-hidden="false">
+      <footer class="todo__footer">
         <span id="items-left">0 items left</span>
       </footer>
     </section>
 
+    <section class="dashboard">
+      <h2>Progress Dashboard</h2>
+      <canvas id="progress-chart" width="300" height="150"></canvas>
+    </section>
+
     <footer class="attribution">
-      <small>Built with ♥ — responsive, accessible, and lightweight.</small>
+      <small>Built by Shiine10 — professional, responsive, and fun!</small>
     </footer>
   </main>
 
